@@ -4,6 +4,7 @@ import fu.swt301.sms.dao.RoleDAO;
 import fu.swt301.sms.dao.StaffDAO;
 import fu.swt301.sms.entity.Role;
 import fu.swt301.sms.entity.Staff;
+import fu.swt301.sms.utils.PasswordUtils;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -62,6 +63,10 @@ public class StaffService {
         }
 
         if (ACTION_CREATE.equals(action)) {
+            if (staff.getPassword() != null && !staff.getPassword().isBlank()
+                    && !PasswordUtils.isBCryptHash(staff.getPassword())) {
+                staff.setPassword(PasswordUtils.hashPassword(staff.getPassword()));
+            }
             staffDAO.createStaff(staff);
         } else if (ACTION_UPDATE.equals(action)) {
             staffDAO.updateStaff(staff);

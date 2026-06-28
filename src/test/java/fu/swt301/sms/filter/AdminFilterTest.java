@@ -55,18 +55,6 @@ class AdminFilterTest {
 
 
     @Test
-    void blocksNonAdminFromDeletingStaff() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", "delete");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN);
-        verify(chain, never()).doFilter(any(), any());
-    }
-
-    @Test
     void blocksNonAdminFromCreatingStaff() throws Exception {
         HttpServletRequest request = requestWithUser("Staff", "GET", "create");
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -90,10 +78,22 @@ class AdminFilterTest {
         verify(chain, never()).doFilter(any(), any());
     }
 
+    @Test
+    void blocksNonAdminFromDeletingStaff() throws Exception {
+        HttpServletRequest request = requestWithUser("Staff", "GET", "delete");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+
+        new AdminFilter().doFilter(request, response, chain);
+
+        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN);
+        verify(chain, never()).doFilter(any(), any());
+    }
+
 
     @Test
-    void allowsNonAdminToViewStaffDetail() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", "view");
+    void allowsNonAdminWhenNoActionProvided() throws Exception {
+        HttpServletRequest request = requestWithUser("Staff", "GET", null);
         HttpServletResponse response = mock(HttpServletResponse.class);
         FilterChain chain = mock(FilterChain.class);
 
@@ -104,8 +104,8 @@ class AdminFilterTest {
     }
 
     @Test
-    void allowsNonAdminAccessWhenNoActionProvided() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", null);
+    void allowsNonAdminToViewStaffDetail() throws Exception {
+        HttpServletRequest request = requestWithUser("Staff", "GET", "view");
         HttpServletResponse response = mock(HttpServletResponse.class);
         FilterChain chain = mock(FilterChain.class);
 
@@ -149,7 +149,6 @@ class AdminFilterTest {
     private static Staff staffWithRole(String roleName) {
         Role role = new Role();
         role.setRoleName(roleName);
-
         Staff staff = new Staff();
         staff.setRole(role);
         return staff;

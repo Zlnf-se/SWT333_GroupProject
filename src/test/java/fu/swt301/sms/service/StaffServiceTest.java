@@ -9,7 +9,10 @@ import java.sql.SQLException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import fu.swt301.sms.utils.PasswordUtils;
 
 class StaffServiceTest {
 
@@ -53,7 +56,8 @@ class StaffServiceTest {
         dao.employeeCodeExists = true;
 
         Staff staff = buildStaff(0);
-        staff.setEmployeeCode("EMP001"); 
+        staff.setEmployeeCode("EMP001");
+
         String error = new StaffService(dao, new RoleDAO()).saveStaff("create", staff);
 
         assertEquals("Employee code already exists. Please choose another one.", error);
@@ -78,7 +82,7 @@ class StaffServiceTest {
         FakeStaffDAO dao = new FakeStaffDAO();
         dao.employeeCodeExists = true;
         Staff staff = buildStaff(0);
-        staff.setEmployeeCode(null); 
+        staff.setEmployeeCode(null);
 
         String error = new StaffService(dao, new RoleDAO()).saveStaff("create", staff);
 
@@ -96,6 +100,30 @@ class StaffServiceTest {
 
         assertNull(error);
         assertEquals(staff, dao.updatedStaff);
+    }
+
+    @Test
+    void saveStaffHashesPlainTextPasswordBeforeCreate() throws SQLException, ClassNotFoundException {
+        FakeStaffDAO dao = new FakeStaffDAO();
+        Staff staff = buildStaff(0);
+        staff.setPassword("plaintext123");
+
+        new StaffService(dao, new RoleDAO()).saveStaff("create", staff);
+
+        assertNotNull(dao.createdStaff.getPassword());
+        assertTrue(dao.createdStaff.getPassword().startsWith("$2a$"));
+    }
+
+    @Test
+    void saveStaffDoesNotDoubleHashAlreadyHashedPassword() throws SQLException, ClassNotFoundException {
+        FakeStaffDAO dao = new FakeStaffDAO();
+        Staff staff = buildStaff(0);
+        String alreadyHashed = PasswordUtils.hashPassword("admin123");
+        staff.setPassword(alreadyHashed);
+
+        new StaffService(dao, new RoleDAO()).saveStaff("create", staff);
+
+        assertEquals(alreadyHashed, dao.createdStaff.getPassword());
     }
 
 
@@ -133,7 +161,7 @@ class StaffServiceTest {
         assertEquals(2, page.getPage());
         assertEquals(5, page.getPageSize());
         assertEquals(12, page.getTotalItems());
-        assertEquals(3, page.getTotalPages()); 
+        assertEquals(3, page.getTotalPages());
     }
 
     @Test
@@ -144,7 +172,7 @@ class StaffServiceTest {
         StaffPage page = new StaffService(dao, new RoleDAO())
                 .getStaffPage(null, null, null, null, 0, 10);
 
-        assertEquals(1, page.getPage()); 
+        assertEquals(1, page.getPage());
     }
 
     @Test
@@ -155,7 +183,7 @@ class StaffServiceTest {
         StaffPage page = new StaffService(dao, new RoleDAO())
                 .getStaffPage(null, null, null, null, 1, 0);
 
-        assertEquals(10, page.getPageSize()); 
+        assertEquals(10, page.getPageSize());
     }
 
     @Test
@@ -164,9 +192,9 @@ class StaffServiceTest {
         dao.totalStaff = 5;
 
         StaffPage page = new StaffService(dao, new RoleDAO())
-                .getStaffPage(null, null, null, null, 99, 5); 
+                .getStaffPage(null, null, null, null, 99, 5);
 
-        assertEquals(1, page.getPage()); 
+        assertEquals(1, page.getPage());
     }
 
     @Test
