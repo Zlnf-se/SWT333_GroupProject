@@ -20,6 +20,8 @@ import java.sql.SQLException;
  */
 @WebListener
 public class DataInitializer implements ServletContextListener {
+    private final DefaultAccountSeeder defaultAccountSeeder = new DefaultAccountSeeder();
+
 
     /**
      * This method is called by the container when the web application is first started.
@@ -34,23 +36,7 @@ public class DataInitializer implements ServletContextListener {
             createRoleTableIfNotExists(conn);
             createStaffTableIfNotExists(conn);
             ensureStaffAuthColumns(conn);
-
-            // Step 2: Check if the 'Role' table is empty. If it is, we assume the database is new and needs seeding.
-            boolean dataExists = false;
-            try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM Role");
-                 ResultSet rs = ps.executeQuery()) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    dataExists = true;
-                }
-            }
-
-            // Step 3: If no data exists, insert the default roles and a default admin user.
-            if (!dataExists) {
-                System.out.println("No data found. Initializing default data...");
-                insertDefaultData(conn);
-            } else {
-                System.out.println("Data already exists. Skipping initialization.");
-            }
+            defaultAccountSeeder.seed(conn);
             hashPlainTextPasswords(conn);
 
         } catch (SQLException | ClassNotFoundException e) {
@@ -118,12 +104,19 @@ public class DataInitializer implements ServletContextListener {
             String createSQL = "CREATE TABLE Staff (" +
                                "StaffID INT PRIMARY KEY IDENTITY(1,1), " +
                                "FullName NVARCHAR(100) NOT NULL, " +
+                               "EmployeeCode VARCHAR(50) NULL, " +
                                "Gender BIT NOT NULL, " +
                                "PhoneNumber VARCHAR(20), " +
                                "Email VARCHAR(100) NOT NULL UNIQUE, " +
                                "Password VARCHAR(255) NOT NULL, " +
                                "Role_ID INT NOT NULL, " +
                                "IsActive BIT NOT NULL, " +
+                               "DateOfBirth DATE NULL, " +
+                               "Department NVARCHAR(100) NULL, " +
+                               "Position NVARCHAR(100) NULL, " +
+                               "Salary DECIMAL(18, 2) NULL, " +
+                               "HireDate DATE NULL, " +
+                               "Deleted BIT NOT NULL CONSTRAINT DF_Staff_Deleted DEFAULT 0, " +
                                "FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Staff_FailedLoginAttempts DEFAULT 0, " +
                                "LockUntil DATETIME2 NULL, " +
                                "CONSTRAINT FK_Staff_Role FOREIGN KEY (Role_ID) REFERENCES Role(Role_ID)" +
@@ -150,6 +143,39 @@ public class DataInitializer implements ServletContextListener {
                 System.out.println("Column 'LockUntil' added to Staff.");
             }
         }
+
+        ensureStaffProfileColumns(conn);
+    }
+
+    private void ensureStaffProfileColumns(Connection conn) throws SQLException {
+        if (!columnExists(conn, "Staff", "EmployeeCode")) {
+            addColumn(conn, "ALTER TABLE Staff ADD EmployeeCode VARCHAR(50) NULL", "EmployeeCode");
+        }
+        if (!columnExists(conn, "Staff", "DateOfBirth")) {
+            addColumn(conn, "ALTER TABLE Staff ADD DateOfBirth DATE NULL", "DateOfBirth");
+        }
+        if (!columnExists(conn, "Staff", "Department")) {
+            addColumn(conn, "ALTER TABLE Staff ADD Department NVARCHAR(100) NULL", "Department");
+        }
+        if (!columnExists(conn, "Staff", "Position")) {
+            addColumn(conn, "ALTER TABLE Staff ADD Position NVARCHAR(100) NULL", "Position");
+        }
+        if (!columnExists(conn, "Staff", "Salary")) {
+            addColumn(conn, "ALTER TABLE Staff ADD Salary DECIMAL(18, 2) NULL", "Salary");
+        }
+        if (!columnExists(conn, "Staff", "HireDate")) {
+            addColumn(conn, "ALTER TABLE Staff ADD HireDate DATE NULL", "HireDate");
+        }
+        if (!columnExists(conn, "Staff", "Deleted")) {
+            addColumn(conn, "ALTER TABLE Staff ADD Deleted BIT NOT NULL CONSTRAINT DF_Staff_Deleted DEFAULT 0 WITH VALUES", "Deleted");
+        }
+    }
+
+    private void addColumn(Connection conn, String sql, String columnName) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.execute();
+            System.out.println("Column '" + columnName + "' added to Staff.");
+        }
     }
 
     private boolean columnExists(Connection conn, String tableName, String columnName) throws SQLException {
@@ -160,40 +186,6 @@ public class DataInitializer implements ServletContextListener {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getInt(1) > 0;
             }
-        }
-    }
-
-    /**
-     * Inserts a predefined set of data into the 'Role' and 'Staff' tables.
-     * This includes 'Admin' and 'Staff' roles, and a default administrator account.
-     * @param conn The active database connection.
-     * @throws SQLException if a database access error occurs.
-     */
-    private void insertDefaultData(Connection conn) throws SQLException {
-        // Insert default roles using a batch operation for efficiency.
-        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO Role (Role_ID, Role_Name) VALUES (?, ?)")) {
-            ps.setInt(1, 1);
-            ps.setString(2, "Admin");
-            ps.addBatch();
-
-            ps.setInt(1, 2);
-            ps.setString(2, "Staff");
-            ps.addBatch();
-
-            ps.executeBatch();
-            System.out.println("Default roles inserted.");
-        }
-
-        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO Staff (FullName, Gender, PhoneNumber, Email, Password, Role_ID, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
-            ps.setString(1, "Admin User");
-            ps.setBoolean(2, true); // true for Male
-            ps.setString(3, "0123456789");
-            ps.setString(4, "admin@example.com");
-            ps.setString(5, PasswordUtils.hashPassword("admin123"));
-            ps.setInt(6, 1); // Role_ID for Admin
-            ps.setBoolean(7, true); // IsActive
-            ps.executeUpdate();
-            System.out.println("Default admin user inserted.");
         }
     }
 

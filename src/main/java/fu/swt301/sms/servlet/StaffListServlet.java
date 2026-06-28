@@ -1,6 +1,7 @@
 package fu.swt301.sms.servlet;
 
 import fu.swt301.sms.entity.Staff;
+import fu.swt301.sms.service.StaffPage;
 import fu.swt301.sms.service.StaffService;
 
 import jakarta.servlet.ServletException;
@@ -25,11 +26,29 @@ public class StaffListServlet extends HttpServlet {
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String searchName = request.getParameter("searchName");
+        String employeeCode = request.getParameter("employeeCode");
+        String department = request.getParameter("department");
         String searchStatus = request.getParameter("searchStatus");
+        int page = parseInt(request.getParameter("page"), 1);
+        int pageSize = parseInt(request.getParameter("pageSize"), 10);
 
-        List<Staff> staffList = staffService.getStaffByFilter(searchName, searchStatus);
+        StaffPage staffPage = staffService.getStaffPage(searchName, employeeCode, department, searchStatus, page, pageSize);
+        List<Staff> staffList = staffPage.getStaffList();
 
         request.setAttribute("staffList", staffList);
+        request.setAttribute("staffPage", staffPage);
+        request.setAttribute("page", staffPage.getPage());
+        request.setAttribute("pageSize", staffPage.getPageSize());
+        request.setAttribute("totalPages", staffPage.getTotalPages());
+        request.setAttribute("totalItems", staffPage.getTotalItems());
         request.getRequestDispatcher("staff-list.jsp").forward(request, response);
+    }
+
+    private int parseInt(String value, int defaultValue) {
+        try {
+            return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }

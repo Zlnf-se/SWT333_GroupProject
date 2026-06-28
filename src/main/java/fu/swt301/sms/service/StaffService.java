@@ -4,6 +4,7 @@ import fu.swt301.sms.dao.RoleDAO;
 import fu.swt301.sms.dao.StaffDAO;
 import fu.swt301.sms.entity.Role;
 import fu.swt301.sms.entity.Staff;
+import fu.swt301.sms.utils.PasswordUtils;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -28,6 +29,21 @@ public class StaffService {
         return staffDAO.getStaffByFilter(searchName, searchStatus);
     }
 
+    public StaffPage getStaffPage(String searchName, String employeeCode, String department,
+                                  String searchStatus, int page, int pageSize) {
+        int normalizedPage = page < 1 ? 1 : page;
+        int normalizedPageSize = pageSize < 1 ? 10 : pageSize;
+        int totalItems = staffDAO.countStaffByFilter(searchName, employeeCode, department, searchStatus);
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / normalizedPageSize));
+        if (normalizedPage > totalPages) {
+            normalizedPage = totalPages;
+        }
+
+        List<Staff> staffList = staffDAO.getStaffByFilter(
+                searchName, employeeCode, department, searchStatus, normalizedPage, normalizedPageSize);
+        return new StaffPage(staffList, normalizedPage, normalizedPageSize, totalItems);
+    }
+
     public List<Role> getAllRoles() {
         return roleDAO.getAllRoles();
     }
@@ -47,6 +63,10 @@ public class StaffService {
         }
 
         if (ACTION_CREATE.equals(action)) {
+            if (staff.getPassword() != null && !staff.getPassword().isBlank()
+                    && !PasswordUtils.isBCryptHash(staff.getPassword())) {
+                staff.setPassword(PasswordUtils.hashPassword(staff.getPassword()));
+            }
             staffDAO.createStaff(staff);
         } else if (ACTION_UPDATE.equals(action)) {
             staffDAO.updateStaff(staff);
@@ -64,6 +84,10 @@ public class StaffService {
             }
             if (staffDAO.isPhoneNumberExists(staff.getPhoneNumber(), staff.getStaffID())) {
                 return "Phone number already exists. Please choose another one.";
+            }
+            if (staff.getEmployeeCode() != null && !staff.getEmployeeCode().isBlank()
+                    && staffDAO.isEmployeeCodeExists(staff.getEmployeeCode(), staff.getStaffID())) {
+                return "Employee code already exists. Please choose another one.";
             }
             return null;
         } catch (SQLException | ClassNotFoundException e) {

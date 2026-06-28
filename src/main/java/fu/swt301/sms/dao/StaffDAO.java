@@ -6,40 +6,37 @@ import fu.swt301.sms.utils.DBUtils;
 import fu.swt301.sms.utils.PasswordUtils;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Data Access Object (DAO) for the Staff entity.
- * This class provides all the necessary methods to interact with the 'Staff' table in the database.
- * It handles all CRUD (Create, Read, Update, Delete) operations as well as other specific queries.
- */
 public class StaffDAO {
 
-    /**
-     * A private helper method to map a row from the ResultSet to a Staff object.
-     * This avoids code duplication in methods that retrieve staff data.
-     * It performs a JOIN with the Role table to populate the nested Role object.
-     * @param rs The ResultSet cursor, positioned at the row to be mapped.
-     * @return A fully populated Staff object.
-     * @throws SQLException if a database access error occurs.
-     */
     private Staff extractStaffFromResultSet(ResultSet rs) throws SQLException {
         Staff staff = new Staff();
         staff.setStaffID(rs.getInt("StaffID"));
+        staff.setEmployeeCode(rs.getString("EmployeeCode"));
         staff.setFullName(rs.getString("FullName"));
         staff.setGender(rs.getBoolean("Gender"));
         staff.setPhoneNumber(rs.getString("PhoneNumber"));
         staff.setEmail(rs.getString("Email"));
         staff.setPassword(rs.getString("Password"));
         staff.setIsActive(rs.getBoolean("IsActive"));
+        staff.setDateOfBirth(toLocalDate(rs.getDate("DateOfBirth")));
+        staff.setDepartment(rs.getString("Department"));
+        staff.setPosition(rs.getString("Position"));
+        staff.setSalary(rs.getBigDecimal("Salary"));
+        staff.setHireDate(toLocalDate(rs.getDate("HireDate")));
+        staff.setDeleted(rs.getBoolean("Deleted"));
         staff.setFailedLoginAttempts(rs.getInt("FailedLoginAttempts"));
+
         Timestamp lockUntil = rs.getTimestamp("LockUntil");
         if (lockUntil != null) {
             staff.setLockUntil(lockUntil.toLocalDateTime());
@@ -53,60 +50,32 @@ public class StaffDAO {
         return staff;
     }
 
-    /**
-     * Checks if a given email already exists in the Staff table, excluding a specific staff member.
-     * This is crucial for validation during updates to prevent a user from taking another user's email.
-     * @param email The email to check for existence.
-     * @param currentStaffId The ID of the staff member being updated. Use 0 when creating a new staff member.
-     * @return true if the email exists for another staff member, false otherwise.
-     * @throws SQLException if a database access error occurs.
-     * @throws ClassNotFoundException if the database driver is not found.
-     */
     public boolean isEmailExists(String email, int currentStaffId) throws SQLException, ClassNotFoundException {
-        String sql = "SELECT COUNT(*) FROM Staff WHERE Email = ? AND StaffID != ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, email);
-            ps.setInt(2, currentStaffId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getInt(1) > 0;
-            }
-        }
+        return existsByField("Email", email, currentStaffId);
     }
 
-    /**
-     * Checks if a given full name already exists in the Staff table, excluding a specific staff member.
-     * @param fullName The full name to check.
-     * @param currentStaffId The ID of the staff member being updated. Use 0 for new staff.
-     * @return true if the name exists for another staff member, false otherwise.
-     * @throws SQLException if a database access error occurs.
-     * @throws ClassNotFoundException if the database driver is not found.
-     */
     public boolean isFullNameExists(String fullName, int currentStaffId) throws SQLException, ClassNotFoundException {
-        String sql = "SELECT COUNT(*) FROM Staff WHERE FullName = ? AND StaffID != ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, fullName);
-            ps.setInt(2, currentStaffId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getInt(1) > 0;
-            }
-        }
+        return existsByField("FullName", fullName, currentStaffId);
     }
 
-    /**
-     * Checks if a given phone number already exists in the Staff table, excluding a specific staff member.
-     * @param phoneNumber The phone number to check.
-     * @param currentStaffId The ID of the staff member being updated. Use 0 for new staff.
-     * @return true if the phone number exists for another staff member, false otherwise.
-     * @throws SQLException if a database access error occurs.
-     * @throws ClassNotFoundException if the database driver is not found.
-     */
     public boolean isPhoneNumberExists(String phoneNumber, int currentStaffId) throws SQLException, ClassNotFoundException {
-        String sql = "SELECT COUNT(*) FROM Staff WHERE PhoneNumber = ? AND StaffID != ?";
+        return existsByField("PhoneNumber", phoneNumber, currentStaffId);
+    }
+
+    public boolean isEmployeeCodeExists(String employeeCode, int currentStaffId) throws SQLException, ClassNotFoundException {
+        return existsByField("EmployeeCode", employeeCode, currentStaffId);
+    }
+
+    private boolean existsByField(String columnName, String value, int currentStaffId)
+            throws SQLException, ClassNotFoundException {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+
+        String sql = "SELECT COUNT(*) FROM Staff WHERE " + columnName + " = ? AND StaffID != ? AND Deleted = 0";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, phoneNumber);
+            ps.setString(1, value);
             ps.setInt(2, currentStaffId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getInt(1) > 0;
@@ -115,7 +84,8 @@ public class StaffDAO {
     }
 
     public Staff findByEmail(String email) {
-        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID WHERE s.Email = ?";
+        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID "
+                + "WHERE s.Email = ? AND s.Deleted = 0";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
@@ -158,9 +128,6 @@ public class StaffDAO {
         }
     }
 
-    /**
-     * Legacy login entry point kept for older callers. Authentication logic now lives in AuthService.
-     */
     public Staff checkLogin(String email, String password) {
         Staff staff = findByEmail(email);
         if (staff != null && PasswordUtils.checkPassword(password, staff.getPassword())) {
@@ -169,30 +136,23 @@ public class StaffDAO {
         return null;
     }
 
-    /**
-     * Retrieves a list of staff members based on optional filter criteria.
-     * @param name A string to search for in the full name (case-insensitive). Can be null or empty.
-     * @param status The active status to filter by ("true" or "false"). Can be null or empty.
-     * @return A list of Staff objects matching the criteria.
-     */
     public List<Staff> getStaffByFilter(String name, String status) {
+        return getStaffByFilter(name, null, null, status, 1, Integer.MAX_VALUE);
+    }
+
+    public List<Staff> getStaffByFilter(String name, String employeeCode, String department,
+                                        String status, int page, int pageSize) {
         List<Staff> staffList = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID WHERE 1=1");
-        if (name != null && !name.isEmpty()) {
-            sql.append(" AND s.FullName LIKE ?");
-        }
-        if (status != null && !status.isEmpty()) {
-            sql.append(" AND s.IsActive = ?");
-        }
+        StringBuilder sql = new StringBuilder("SELECT s.*, r.Role_Name FROM Staff s "
+                + "JOIN Role r ON s.Role_ID = r.Role_ID WHERE s.Deleted = 0");
+        appendFilterConditions(sql, name, employeeCode, department, status);
+        sql.append(" ORDER BY s.StaffID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            int paramIndex = 1;
-            if (name != null && !name.isEmpty()) {
-                ps.setString(paramIndex++, "%" + name + "%");
-            }
-            if (status != null && !status.isEmpty()) {
-                ps.setBoolean(paramIndex, Boolean.parseBoolean(status));
-            }
+            int paramIndex = setFilterParameters(ps, name, employeeCode, department, status);
+            ps.setInt(paramIndex++, (page - 1) * pageSize);
+            ps.setInt(paramIndex, pageSize);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     staffList.add(extractStaffFromResultSet(rs));
@@ -204,55 +164,52 @@ public class StaffDAO {
         return staffList;
     }
 
-    /**
-     * Inserts a new staff member into the database.
-     * @param staff The Staff object containing the data to be inserted.
-     */
+    public int countStaffByFilter(String name, String employeeCode, String department, String status) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM Staff s WHERE s.Deleted = 0");
+        appendFilterConditions(sql, name, employeeCode, department, status);
+
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            setFilterParameters(ps, name, employeeCode, department, status);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
     public void createStaff(Staff staff) {
-        String sql = "INSERT INTO Staff (FullName, Gender, PhoneNumber, Email, Password, Role_ID, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Staff (EmployeeCode, FullName, Gender, PhoneNumber, Email, Password, Role_ID, "
+                + "IsActive, DateOfBirth, Department, Position, Salary, HireDate, Deleted) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, staff.getFullName());
-            ps.setBoolean(2, staff.isGender());
-            ps.setString(3, staff.getPhoneNumber());
-            ps.setString(4, staff.getEmail());
-            ps.setString(5, staff.getPassword());
-            ps.setInt(6, staff.getRole().getRoleID());
-            ps.setBoolean(7, staff.isIsActive());
+            setStaffWriteParameters(ps, staff, true);
             ps.executeUpdate();
         } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Updates an existing staff member's information in the database.
-     * The password is not updated via this method.
-     * @param staff The Staff object containing the updated data. The StaffID must be set.
-     */
     public void updateStaff(Staff staff) {
-        String sql = "UPDATE Staff SET FullName = ?, Gender = ?, PhoneNumber = ?, Email = ?, Role_ID = ?, IsActive = ? WHERE StaffID = ?";
+        String sql = "UPDATE Staff SET EmployeeCode = ?, FullName = ?, Gender = ?, PhoneNumber = ?, Email = ?, "
+                + "Role_ID = ?, IsActive = ?, DateOfBirth = ?, Department = ?, Position = ?, Salary = ?, HireDate = ? "
+                + "WHERE StaffID = ?";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, staff.getFullName());
-            ps.setBoolean(2, staff.isGender());
-            ps.setString(3, staff.getPhoneNumber());
-            ps.setString(4, staff.getEmail());
-            ps.setInt(5, staff.getRole().getRoleID());
-            ps.setBoolean(6, staff.isIsActive());
-            ps.setInt(7, staff.getStaffID());
+            setStaffWriteParameters(ps, staff, false);
             ps.executeUpdate();
         } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Deletes a staff member from the database by their ID.
-     * @param staffId The ID of the staff member to delete.
-     */
     public void deleteStaff(int staffId) {
-        String sql = "DELETE FROM Staff WHERE StaffID = ?";
+        String sql = "UPDATE Staff SET Deleted = 1 WHERE StaffID = ?";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, staffId);
@@ -262,13 +219,9 @@ public class StaffDAO {
         }
     }
 
-    /**
-     * Retrieves a single staff member by their unique ID.
-     * @param staffId The ID of the staff member to retrieve.
-     * @return A populated Staff object if found, null otherwise.
-     */
     public Staff getStaffById(int staffId) {
-        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID WHERE s.StaffID = ?";
+        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID "
+                + "WHERE s.StaffID = ? AND s.Deleted = 0";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, staffId);
@@ -281,5 +234,74 @@ public class StaffDAO {
             e.printStackTrace();
         }
         return null;
+    }
+
+    private void appendFilterConditions(StringBuilder sql, String name, String employeeCode,
+                                        String department, String status) {
+        if (name != null && !name.isBlank()) {
+            sql.append(" AND s.FullName LIKE ?");
+        }
+        if (employeeCode != null && !employeeCode.isBlank()) {
+            sql.append(" AND s.EmployeeCode LIKE ?");
+        }
+        if (department != null && !department.isBlank()) {
+            sql.append(" AND s.Department LIKE ?");
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND s.IsActive = ?");
+        }
+    }
+
+    private int setFilterParameters(PreparedStatement ps, String name, String employeeCode,
+                                    String department, String status) throws SQLException {
+        int paramIndex = 1;
+        if (name != null && !name.isBlank()) {
+            ps.setString(paramIndex++, "%" + name.trim() + "%");
+        }
+        if (employeeCode != null && !employeeCode.isBlank()) {
+            ps.setString(paramIndex++, "%" + employeeCode.trim() + "%");
+        }
+        if (department != null && !department.isBlank()) {
+            ps.setString(paramIndex++, "%" + department.trim() + "%");
+        }
+        if (status != null && !status.isBlank()) {
+            ps.setBoolean(paramIndex++, Boolean.parseBoolean(status));
+        }
+        return paramIndex;
+    }
+
+    private void setStaffWriteParameters(PreparedStatement ps, Staff staff, boolean includePassword) throws SQLException {
+        ps.setString(1, staff.getEmployeeCode());
+        ps.setString(2, staff.getFullName());
+        ps.setBoolean(3, staff.isGender());
+        ps.setString(4, staff.getPhoneNumber());
+        ps.setString(5, staff.getEmail());
+
+        int index = 6;
+        if (includePassword) {
+            ps.setString(index++, staff.getPassword());
+        }
+        ps.setInt(index++, staff.getRole().getRoleID());
+        ps.setBoolean(index++, staff.isIsActive());
+        setDateOrNull(ps, index++, staff.getDateOfBirth());
+        ps.setString(index++, staff.getDepartment());
+        ps.setString(index++, staff.getPosition());
+        ps.setBigDecimal(index++, staff.getSalary());
+        setDateOrNull(ps, index++, staff.getHireDate());
+        if (!includePassword) {
+            ps.setInt(index, staff.getStaffID());
+        }
+    }
+
+    private void setDateOrNull(PreparedStatement ps, int parameterIndex, LocalDate value) throws SQLException {
+        if (value == null) {
+            ps.setNull(parameterIndex, Types.DATE);
+        } else {
+            ps.setDate(parameterIndex, Date.valueOf(value));
+        }
+    }
+
+    private LocalDate toLocalDate(Date date) {
+        return date == null ? null : date.toLocalDate();
     }
 }
