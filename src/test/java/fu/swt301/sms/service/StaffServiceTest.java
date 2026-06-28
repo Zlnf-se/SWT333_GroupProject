@@ -29,6 +29,41 @@ class StaffServiceTest {
     }
 
     @Test
+    void saveStaffReturnsDuplicateFullNameMessageAndDoesNotCreate() throws SQLException, ClassNotFoundException {
+        FakeStaffDAO staffDAO = new FakeStaffDAO();
+        Staff staff = new Staff();
+        staff.setStaffID(0);
+        staff.setEmail("new@example.com");
+        staff.setFullName("Existing Staff");
+
+        staffDAO.fullNameExists = true;
+
+        StaffService staffService = new StaffService(staffDAO, new RoleDAO());
+        String errorMessage = staffService.saveStaff("create", staff);
+
+        assertEquals("Full name already exists. Please choose another one.", errorMessage);
+        assertEquals(0, staffDAO.createCalls);
+    }
+
+    @Test
+    void saveStaffReturnsDuplicatePhoneMessageAndDoesNotCreate() throws SQLException, ClassNotFoundException {
+        FakeStaffDAO staffDAO = new FakeStaffDAO();
+        Staff staff = new Staff();
+        staff.setStaffID(0);
+        staff.setEmail("new@example.com");
+        staff.setFullName("New Staff");
+        staff.setPhoneNumber("0123456789");
+
+        staffDAO.phoneNumberExists = true;
+
+        StaffService staffService = new StaffService(staffDAO, new RoleDAO());
+        String errorMessage = staffService.saveStaff("create", staff);
+
+        assertEquals("Phone number already exists. Please choose another one.", errorMessage);
+        assertEquals(0, staffDAO.createCalls);
+    }
+
+    @Test
     void saveStaffCreatesWhenValidationPasses() throws SQLException, ClassNotFoundException {
         FakeStaffDAO staffDAO = new FakeStaffDAO();
         Staff staff = new Staff();
@@ -45,6 +80,22 @@ class StaffServiceTest {
     }
 
     @Test
+    void saveStaffUpdatesWhenValidationPasses() throws SQLException, ClassNotFoundException {
+        FakeStaffDAO staffDAO = new FakeStaffDAO();
+        Staff staff = new Staff();
+        staff.setStaffID(5);
+        staff.setEmail("updated@example.com");
+        staff.setFullName("Updated Staff");
+        staff.setPhoneNumber("0987654321");
+
+        StaffService staffService = new StaffService(staffDAO, new RoleDAO());
+        String errorMessage = staffService.saveStaff("update", staff);
+
+        assertNull(errorMessage);
+        assertEquals(staff, staffDAO.updatedStaff);
+    }
+
+    @Test
     void deleteStaffDelegatesToDao() {
         FakeStaffDAO staffDAO = new FakeStaffDAO();
 
@@ -56,8 +107,11 @@ class StaffServiceTest {
 
     private static class FakeStaffDAO extends StaffDAO {
         private boolean emailExists;
+        private boolean fullNameExists;
+        private boolean phoneNumberExists;
         private int createCalls;
         private Staff createdStaff;
+        private Staff updatedStaff;
         private int deletedStaffId;
 
         @Override
@@ -67,18 +121,23 @@ class StaffServiceTest {
 
         @Override
         public boolean isFullNameExists(String fullName, int currentStaffId) {
-            return false;
+            return fullNameExists;
         }
 
         @Override
         public boolean isPhoneNumberExists(String phoneNumber, int currentStaffId) {
-            return false;
+            return phoneNumberExists;
         }
 
         @Override
         public void createStaff(Staff staff) {
             createCalls++;
             createdStaff = staff;
+        }
+
+        @Override
+        public void updateStaff(Staff staff) {
+            updatedStaff = staff;
         }
 
         @Override
