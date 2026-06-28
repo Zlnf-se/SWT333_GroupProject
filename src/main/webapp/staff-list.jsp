@@ -1,5 +1,6 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="jakarta.tags.core" prefix="c" %>
+<%@ taglib uri="jakarta.tags.functions" prefix="fn" %>
 <html>
 <head>
     <title>Staff List</title>
@@ -15,13 +16,13 @@
             <form class="form-inline" action="staff-list" method="get">
                 <input type="hidden" name="page" value="1">
                 <div class="form-group mr-2 mb-2">
-                    <input type="text" class="form-control" name="searchName" placeholder="Name" value="${param.searchName}">
+                    <input type="text" class="form-control" name="searchName" placeholder="Name" value="${fn:escapeXml(param.searchName)}" maxlength="100">
                 </div>
                 <div class="form-group mr-2 mb-2">
-                    <input type="text" class="form-control" name="employeeCode" placeholder="Employee code" value="${param.employeeCode}">
+                    <input type="text" class="form-control" name="employeeCode" placeholder="Employee code" value="${fn:escapeXml(param.employeeCode)}" maxlength="50">
                 </div>
                 <div class="form-group mr-2 mb-2">
-                    <input type="text" class="form-control" name="department" placeholder="Department" value="${param.department}">
+                    <input type="text" class="form-control" name="department" placeholder="Department" value="${fn:escapeXml(param.department)}" maxlength="100">
                 </div>
                 <div class="form-group mr-2 mb-2">
                     <select class="form-control" name="searchStatus">
@@ -49,7 +50,7 @@
     </div>
 
     <div class="mb-2 text-muted">
-        Total staff: ${totalItems}
+        Total staff: <c:out value="${totalItems}" />
     </div>
 
     <table class="table table-bordered table-sm">
@@ -71,15 +72,15 @@
         <tbody>
         <c:forEach var="staff" items="${staffList}">
             <tr>
-                <td>${staff.staffID}</td>
-                <td>${staff.employeeCode}</td>
-                <td>${staff.fullName}</td>
+                <td><c:out value="${staff.staffID}" /></td>
+                <td><c:out value="${staff.employeeCode}" /></td>
+                <td><c:out value="${staff.fullName}" /></td>
                 <td>${staff.gender ? 'Male' : 'Female'}</td>
-                <td>${staff.phoneNumber}</td>
-                <td>${staff.email}</td>
-                <td>${staff.department}</td>
-                <td>${staff.position}</td>
-                <td>${staff.role.roleName}</td>
+                <td><c:out value="${staff.phoneNumber}" /></td>
+                <td><c:out value="${staff.email}" /></td>
+                <td><c:out value="${staff.department}" /></td>
+                <td><c:out value="${staff.position}" /></td>
+                <td><c:out value="${staff.role.roleName}" /></td>
                 <td>${staff.isActive ? 'Active' : 'Inactive'}</td>
                 <td>
                     <a href="staff-detail?id=${staff.staffID}" class="btn btn-sm btn-info">View</a>
@@ -123,7 +124,7 @@
                         <c:param name="page" value="${pageNumber}" />
                     </c:url>
                     <li class="page-item ${page == pageNumber ? 'active' : ''}">
-                        <a class="page-link" href="${pageUrl}">${pageNumber}</a>
+                        <a class="page-link" href="${pageUrl}"><c:out value="${pageNumber}" /></a>
                     </li>
                 </c:forEach>
 
