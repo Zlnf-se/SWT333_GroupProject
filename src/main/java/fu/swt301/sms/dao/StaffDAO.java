@@ -3,11 +3,15 @@ package fu.swt301.sms.dao;
 import fu.swt301.sms.entity.Role;
 import fu.swt301.sms.entity.Staff;
 import fu.swt301.sms.utils.DBUtils;
+import fu.swt301.sms.utils.PasswordUtils;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +37,13 @@ public class StaffDAO {
         staff.setGender(rs.getBoolean("Gender"));
         staff.setPhoneNumber(rs.getString("PhoneNumber"));
         staff.setEmail(rs.getString("Email"));
+        staff.setPassword(rs.getString("Password"));
         staff.setIsActive(rs.getBoolean("IsActive"));
+        staff.setFailedLoginAttempts(rs.getInt("FailedLoginAttempts"));
+        Timestamp lockUntil = rs.getTimestamp("LockUntil");
+        if (lockUntil != null) {
+            staff.setLockUntil(lockUntil.toLocalDateTime());
+        }
 
         Role role = new Role();
         role.setRoleID(rs.getInt("Role_ID"));
@@ -104,18 +114,11 @@ public class StaffDAO {
         }
     }
 
-    /**
-     * Authenticates a user by checking their email and password against the database.
-     * @param email The user's email.
-     * @param password The user's plain text password.
-     * @return A populated Staff object if authentication is successful, null otherwise.
-     */
-    public Staff checkLogin(String email, String password) {
-        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID WHERE s.Email = ? AND s.Password = ?";
+    public Staff findByEmail(String email) {
+        String sql = "SELECT s.*, r.Role_Name FROM Staff s JOIN Role r ON s.Role_ID = r.Role_ID WHERE s.Email = ?";
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
-            ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return extractStaffFromResultSet(rs);
@@ -123,6 +126,45 @@ public class StaffDAO {
             }
         } catch (ClassNotFoundException | SQLException e) {
             e.printStackTrace();
+        }
+        return null;
+    }
+
+    public void recordFailedLogin(int staffId, int failedAttempts, LocalDateTime lockUntil) {
+        String sql = "UPDATE Staff SET FailedLoginAttempts = ?, LockUntil = ? WHERE StaffID = ?";
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, failedAttempts);
+            if (lockUntil == null) {
+                ps.setNull(2, Types.TIMESTAMP);
+            } else {
+                ps.setTimestamp(2, Timestamp.valueOf(lockUntil));
+            }
+            ps.setInt(3, staffId);
+            ps.executeUpdate();
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void resetLoginFailures(int staffId) {
+        String sql = "UPDATE Staff SET FailedLoginAttempts = 0, LockUntil = NULL WHERE StaffID = ?";
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, staffId);
+            ps.executeUpdate();
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Legacy login entry point kept for older callers. Authentication logic now lives in AuthService.
+     */
+    public Staff checkLogin(String email, String password) {
+        Staff staff = findByEmail(email);
+        if (staff != null && PasswordUtils.checkPassword(password, staff.getPassword())) {
+            return staff;
         }
         return null;
     }

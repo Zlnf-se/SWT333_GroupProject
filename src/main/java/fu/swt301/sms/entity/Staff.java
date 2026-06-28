@@ -1,5 +1,7 @@
 package fu.swt301.sms.entity;
 
+import java.time.LocalDateTime;
+
 public class Staff {
     private int staffID;
     private String fullName;
@@ -9,6 +11,8 @@ public class Staff {
     private String password;
     private Role role; // Changed from String to Role
     private boolean isActive;
+    private int failedLoginAttempts;
+    private LocalDateTime lockUntil;
 
     public int getStaffID() {
         return staffID;
@@ -72,5 +76,21 @@ public class Staff {
 
     public void setIsActive(boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public LocalDateTime getLockUntil() {
+        return lockUntil;
+    }
+
+    public void setLockUntil(LocalDateTime lockUntil) {
+        this.lockUntil = lockUntil;
     }
 }

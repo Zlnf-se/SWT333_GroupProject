@@ -1,6 +1,7 @@
 package fu.swt301.sms.config;
 
 import fu.swt301.sms.utils.DBUtils;
+import fu.swt301.sms.utils.PasswordUtils;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.annotation.WebListener;
@@ -32,6 +33,7 @@ public class DataInitializer implements ServletContextListener {
             System.out.println("Checking database schema...");
             createRoleTableIfNotExists(conn);
             createStaffTableIfNotExists(conn);
+            ensureStaffAuthColumns(conn);
 
             // Step 2: Check if the 'Role' table is empty. If it is, we assume the database is new and needs seeding.
             boolean dataExists = false;
@@ -49,6 +51,7 @@ public class DataInitializer implements ServletContextListener {
             } else {
                 System.out.println("Data already exists. Skipping initialization.");
             }
+            hashPlainTextPasswords(conn);
 
         } catch (SQLException | ClassNotFoundException e) {
             // If any database error occurs during initialization, log it and throw a RuntimeException
@@ -121,11 +124,41 @@ public class DataInitializer implements ServletContextListener {
                                "Password VARCHAR(255) NOT NULL, " +
                                "Role_ID INT NOT NULL, " +
                                "IsActive BIT NOT NULL, " +
+                               "FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Staff_FailedLoginAttempts DEFAULT 0, " +
+                               "LockUntil DATETIME2 NULL, " +
                                "CONSTRAINT FK_Staff_Role FOREIGN KEY (Role_ID) REFERENCES Role(Role_ID)" +
                                ")";
             try (PreparedStatement ps = conn.prepareStatement(createSQL)) {
                 ps.execute();
                 System.out.println("Table 'Staff' created.");
+            }
+        }
+    }
+
+    private void ensureStaffAuthColumns(Connection conn) throws SQLException {
+        if (!columnExists(conn, "Staff", "FailedLoginAttempts")) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "ALTER TABLE Staff ADD FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Staff_FailedLoginAttempts DEFAULT 0 WITH VALUES")) {
+                ps.execute();
+                System.out.println("Column 'FailedLoginAttempts' added to Staff.");
+            }
+        }
+
+        if (!columnExists(conn, "Staff", "LockUntil")) {
+            try (PreparedStatement ps = conn.prepareStatement("ALTER TABLE Staff ADD LockUntil DATETIME2 NULL")) {
+                ps.execute();
+                System.out.println("Column 'LockUntil' added to Staff.");
+            }
+        }
+    }
+
+    private boolean columnExists(Connection conn, String tableName, String columnName) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND COLUMN_NAME = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tableName);
+            ps.setString(2, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
             }
         }
     }
@@ -151,18 +184,38 @@ public class DataInitializer implements ServletContextListener {
             System.out.println("Default roles inserted.");
         }
 
-        // Insert a default administrator user for initial login.
-        // IMPORTANT: The password here is plain text. In a real-world application, this should be hashed.
         try (PreparedStatement ps = conn.prepareStatement("INSERT INTO Staff (FullName, Gender, PhoneNumber, Email, Password, Role_ID, IsActive) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
             ps.setString(1, "Admin User");
             ps.setBoolean(2, true); // true for Male
             ps.setString(3, "0123456789");
             ps.setString(4, "admin@example.com");
-            ps.setString(5, "admin123"); // WARNING: Plain text password
+            ps.setString(5, PasswordUtils.hashPassword("admin123"));
             ps.setInt(6, 1); // Role_ID for Admin
             ps.setBoolean(7, true); // IsActive
             ps.executeUpdate();
             System.out.println("Default admin user inserted.");
+        }
+    }
+
+    private void hashPlainTextPasswords(Connection conn) throws SQLException {
+        String selectSql = "SELECT StaffID, Password FROM Staff";
+        try (PreparedStatement selectPs = conn.prepareStatement(selectSql);
+             ResultSet rs = selectPs.executeQuery()) {
+            while (rs.next()) {
+                int staffId = rs.getInt("StaffID");
+                String password = rs.getString("Password");
+                if (!PasswordUtils.isBCryptHash(password)) {
+                    updatePassword(conn, staffId, PasswordUtils.hashPassword(password));
+                }
+            }
+        }
+    }
+
+    private void updatePassword(Connection conn, int staffId, String hashedPassword) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE Staff SET Password = ? WHERE StaffID = ?")) {
+            ps.setString(1, hashedPassword);
+            ps.setInt(2, staffId);
+            ps.executeUpdate();
         }
     }
 
