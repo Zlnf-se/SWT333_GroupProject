@@ -7,6 +7,7 @@
 </head>
 <body>
 <div class="container">
+    <c:set var="isAdmin" value="${not empty sessionScope.user and sessionScope.user.role.roleName == 'Admin'}" />
     <h2 class="text-center mt-5">Staff Management</h2>
     <div class="row mb-3">
         <div class="col-md-6">
@@ -25,7 +26,9 @@
             </form>
         </div>
         <div class="col-md-6 text-right">
-            <a href="staff-crud?action=create" class="btn btn-success">Add New Staff</a>
+            <c:if test="${isAdmin}">
+                <a href="staff-crud?action=create" class="btn btn-success">Add New Staff</a>
+            </c:if>
             <a href="logout" class="btn btn-outline-secondary ml-2">Logout</a>
         </div>
     </div>
@@ -39,7 +42,9 @@
             <th>Email</th>
             <th>Role</th>
             <th>Status</th>
-            <th>Actions</th>
+            <c:if test="${isAdmin}">
+                <th>Actions</th>
+            </c:if>
         </tr>
         </thead>
         <tbody>
@@ -52,10 +57,12 @@
                 <td>${staff.email}</td>
                 <td>${staff.role.roleName}</td>
                 <td>${staff.isActive ? 'Active' : 'Inactive'}</td>
-                <td>
-                    <a href="staff-crud?action=edit&id=${staff.staffID}" class="btn btn-sm btn-warning">Edit</a>
-                    <a href="staff-crud?action=delete&id=${staff.staffID}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
-                </td>
+                <c:if test="${isAdmin}">
+                    <td>
+                        <a href="staff-crud?action=edit&id=${staff.staffID}" class="btn btn-sm btn-warning">Edit</a>
+                        <a href="staff-crud?action=delete&id=${staff.staffID}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
+                    </td>
+                </c:if>
             </tr>
         </c:forEach>
         </tbody>
