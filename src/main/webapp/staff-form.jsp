@@ -7,8 +7,19 @@
 </head>
 <body>
 <div class="container">
+    <c:set var="isAdmin" value="${not empty sessionScope.user and sessionScope.user.role.roleName == 'Admin'}" />
     <h2 class="text-center mt-5">${empty staff ? 'Add New Staff' : 'Edit Staff'}</h2>
 
+    <c:if test="${not isAdmin}">
+        <div class="alert alert-danger text-center" role="alert">
+            You do not have permission to access this page.
+        </div>
+        <div class="text-center">
+            <a href="staff-list" class="btn btn-secondary">Back to Staff List</a>
+        </div>
+    </c:if>
+
+    <c:if test="${isAdmin}">
     <!-- Error Message Display -->
     <c:if test="${not empty errorMessage}">
         <div class="alert alert-danger text-center" role="alert">
@@ -78,6 +89,7 @@
         <button type="submit" class="btn btn-primary">${empty staff ? 'Create' : 'Update'}</button>
         <a href="staff-list" class="btn btn-secondary">Cancel</a>
     </form>
+    </c:if>
 </div>
 </body>
 </html>
