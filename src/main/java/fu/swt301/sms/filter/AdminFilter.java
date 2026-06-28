@@ -46,13 +46,15 @@ public class AdminFilter implements Filter {
     private boolean requiresAdmin(HttpServletRequest request) {
         String action = request.getParameter("action");
         return "POST".equalsIgnoreCase(request.getMethod())
-                || (action != null && ADMIN_ACTIONS.contains(action.toLowerCase()));
+                || action == null
+                || ADMIN_ACTIONS.contains(action.toLowerCase());
     }
 
     private boolean isAdmin(Object user) {
         if (!(user instanceof Staff)) {
             return false;
         }
+
         Role role = ((Staff) user).getRole();
         return role != null && "Admin".equalsIgnoreCase(role.getRoleName());
     }

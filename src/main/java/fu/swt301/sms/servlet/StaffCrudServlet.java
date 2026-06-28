@@ -14,6 +14,10 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * This servlet acts as a controller for all CRUD (Create, Read, Update, Delete) operations related to Staff.
+ * It handles both the display of forms (for creating/editing) and the processing of submitted form data.
+ */
 @WebServlet("/staff-crud")
 public class StaffCrudServlet extends HttpServlet {
     private final StaffService staffService;
@@ -26,86 +30,38 @@ public class StaffCrudServlet extends HttpServlet {
         this.staffService = staffService;
     }
 
+    /**
+     * Handles POST requests, which are used to submit data for creating or updating a staff member.
+     * This method contains the core logic for data validation and persistence.
+     * @param request The HttpServletRequest object containing the form data.
+     * @param response The HttpServletResponse object for sending the response.
+     * @throws ServletException If a servlet-specific error occurs.
+     * @throws IOException If an I/O error occurs.
+     */
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String action = request.getParameter("action");
 
+        // --- Step 1: Populate a Staff object from the request parameters ---
+        // Input strings are trimmed to remove leading/trailing whitespace for data consistency.
         Staff staff = new Staff();
         String staffIdParam = request.getParameter("staffID");
         int staffId = (staffIdParam != null && !staffIdParam.isEmpty()) ? Integer.parseInt(staffIdParam) : 0;
         staff.setStaffID(staffId);
         staff.setEmployeeCode(trimToNull(request.getParameter("employeeCode")));
-
-        String fullName = request.getParameter("fullName");
-        String phoneNumber = request.getParameter("phoneNumber");
-        String email = request.getParameter("email");
-        String salaryStr = request.getParameter("salary");
-        String dateOfBirthStr = request.getParameter("dateOfBirth");
-        String hireDateStr = request.getParameter("hireDate");
-
-        if (fullName == null || fullName.isBlank()) {
-            forwardWithError(request, response, "Full name is required.", staff, action);
-            return;
-        }
-        if (phoneNumber == null || phoneNumber.isBlank()) {
-            forwardWithError(request, response, "Phone number is required.", staff, action);
-            return;
-        }
-        if (email == null || email.isBlank()) {
-            forwardWithError(request, response, "Email is required.", staff, action);
-            return;
-        }
-        if (salaryStr != null && !salaryStr.isBlank()) {
-            try {
-                BigDecimal salary = new BigDecimal(salaryStr);
-                if (salary.compareTo(BigDecimal.ZERO) < 0) {
-                    forwardWithError(request, response, "Salary must be a positive number.", staff, action);
-                    return;
-                }
-                staff.setSalary(salary);
-            } catch (NumberFormatException e) {
-                forwardWithError(request, response, "Salary must be a valid number.", staff, action);
-                return;
-            }
-        }
-        if (dateOfBirthStr != null && !dateOfBirthStr.isBlank()) {
-            try {
-                LocalDate dob = LocalDate.parse(dateOfBirthStr);
-                if (dob.isAfter(LocalDate.now())) {
-                    forwardWithError(request, response, "Date of birth cannot be in the future.", staff, action);
-                    return;
-                }
-                staff.setDateOfBirth(dob);
-            } catch (Exception e) {
-                forwardWithError(request, response, "Date of birth is invalid.", staff, action);
-                return;
-            }
-        }
-        if (hireDateStr != null && !hireDateStr.isBlank()) {
-            try {
-                staff.setHireDate(LocalDate.parse(hireDateStr));
-            } catch (Exception e) {
-                forwardWithError(request, response, "Hire date is invalid.", staff, action);
-                return;
-            }
-        }
-
-        staff.setFullName(fullName.trim());
+        staff.setFullName(request.getParameter("fullName").trim());
         staff.setGender(Boolean.parseBoolean(request.getParameter("gender")));
-        staff.setPhoneNumber(phoneNumber.trim());
-        staff.setEmail(email.trim());
+        staff.setPhoneNumber(request.getParameter("phoneNumber").trim());
+        staff.setEmail(request.getParameter("email").trim());
         staff.setIsActive(Boolean.parseBoolean(request.getParameter("isActive")));
+        staff.setDateOfBirth(parseDate(request.getParameter("dateOfBirth")));
         staff.setDepartment(trimToNull(request.getParameter("department")));
         staff.setPosition(trimToNull(request.getParameter("position")));
-
+        staff.setSalary(parseBigDecimal(request.getParameter("salary")));
+        staff.setHireDate(parseDate(request.getParameter("hireDate")));
         if ("create".equals(action)) {
-            String password = request.getParameter("password");
-            if (password == null || password.isBlank()) {
-                forwardWithError(request, response, "Password is required.", staff, action);
-                return;
-            }
-            staff.setPassword(password);
+            // Password is only captured during creation and is not trimmed.
+            staff.setPassword(request.getParameter("password"));
         }
 
         Role role = new Role();
@@ -114,48 +70,81 @@ public class StaffCrudServlet extends HttpServlet {
 
         String errorMessage = staffService.saveStaff(action, staff);
 
+        // --- Step 3: Handle validation failure ---
+        // If an error message was set, it means validation failed.
         if (errorMessage != null) {
-            forwardWithError(request, response, errorMessage, staff, action);
-            return;
+            // Add the error message and the user-submitted data back into the request.
+            request.setAttribute("errorMessage", errorMessage);
+            request.setAttribute("staff", staff); // This preserves the user's input in the form fields.
+
+            // Also, reload the list of roles for the dropdown.
+            List<Role> roleList = staffService.getAllRoles();
+            request.setAttribute("roleList", roleList);
+
+            // Forward the request back to the form page to display the error and the preserved data.
+            // Using forward is crucial here instead of redirect to maintain the request attributes.
+            request.getRequestDispatcher("staff-form.jsp").forward(request, response);
+            return; // Stop further processing to prevent the invalid data from being saved.
         }
 
+        // After a successful operation, redirect the user to the staff list page.
+        // A redirect is used to prevent form resubmission issues if the user refreshes the page.
         response.sendRedirect("staff-list");
     }
 
+    /**
+     * Handles GET requests, which are used to display pages or perform simple actions like deletion.
+     * @param request The HttpServletRequest object.
+     * @param response The HttpServletResponse object.
+     * @throws ServletException If a servlet-specific error occurs.
+     * @throws IOException If an I/O error occurs.
+     */
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String action = request.getParameter("action");
 
         if ("delete".equals(action)) {
+            // Handle deletion action.
             int staffId = Integer.parseInt(request.getParameter("id"));
             staffService.deleteStaff(staffId);
             response.sendRedirect("staff-list");
         } else {
+            // Handles both "create" and "edit" actions, as both need to display the form.
+            // First, always fetch the list of roles for the dropdown.
             List<Role> roleList = staffService.getAllRoles();
             request.setAttribute("roleList", roleList);
 
             if ("edit".equals(action)) {
+                // If editing, fetch the existing staff member's data to pre-populate the form.
                 int staffId = Integer.parseInt(request.getParameter("id"));
                 Staff staff = staffService.getStaffById(staffId);
                 request.setAttribute("staff", staff);
             }
+            // If creating, we just need the empty form with the role list.
 
+            // Forward to the JSP form for display.
             request.getRequestDispatcher("staff-form.jsp").forward(request, response);
         }
     }
 
-    private void forwardWithError(HttpServletRequest request, HttpServletResponse response,
-                                  String error, Staff staff, String action)
-            throws ServletException, IOException {
-        request.setAttribute("errorMessage", error);
-        request.setAttribute("staff", staff);
-        request.setAttribute("roleList", staffService.getAllRoles());
-        request.getRequestDispatcher("staff-form.jsp").forward(request, response);
+    private String trimToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 
-    private String trimToNull(String value) {
-        if (value == null || value.trim().isEmpty()) return null;
-        return value.trim();
+    private LocalDate parseDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return LocalDate.parse(value);
+    }
+
+    private BigDecimal parseBigDecimal(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return new BigDecimal(value);
     }
 }

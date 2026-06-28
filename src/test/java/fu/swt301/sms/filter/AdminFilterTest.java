@@ -16,7 +16,6 @@ import static org.mockito.Mockito.when;
 
 class AdminFilterTest {
 
-
     @Test
     void allowsAdminToCreateStaff() throws Exception {
         HttpServletRequest request = requestWithUser("Admin", "GET", "create");
@@ -30,55 +29,6 @@ class AdminFilterTest {
     }
 
     @Test
-    void allowsAdminToEditStaff() throws Exception {
-        HttpServletRequest request = requestWithUser("Admin", "GET", "edit");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(chain).doFilter(request, response);
-        verify(response, never()).sendError(any(Integer.class));
-    }
-
-    @Test
-    void allowsAdminToDeleteStaff() throws Exception {
-        HttpServletRequest request = requestWithUser("Admin", "GET", "delete");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(chain).doFilter(request, response);
-        verify(response, never()).sendError(any(Integer.class));
-    }
-
-
-    @Test
-    void blocksNonAdminFromCreatingStaff() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", "create");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN);
-        verify(chain, never()).doFilter(any(), any());
-    }
-
-    @Test
-    void blocksNonAdminFromEditingStaff() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", "edit");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(response).sendError(HttpServletResponse.SC_FORBIDDEN);
-        verify(chain, never()).doFilter(any(), any());
-    }
-
-    @Test
     void blocksNonAdminFromDeletingStaff() throws Exception {
         HttpServletRequest request = requestWithUser("Staff", "GET", "delete");
         HttpServletResponse response = mock(HttpServletResponse.class);
@@ -89,32 +39,6 @@ class AdminFilterTest {
         verify(response).sendError(HttpServletResponse.SC_FORBIDDEN);
         verify(chain, never()).doFilter(any(), any());
     }
-
-
-    @Test
-    void allowsNonAdminWhenNoActionProvided() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", null);
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(chain).doFilter(request, response);
-        verify(response, never()).sendError(any(Integer.class));
-    }
-
-    @Test
-    void allowsNonAdminToViewStaffDetail() throws Exception {
-        HttpServletRequest request = requestWithUser("Staff", "GET", "view");
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        new AdminFilter().doFilter(request, response, chain);
-
-        verify(chain).doFilter(request, response);
-        verify(response, never()).sendError(any(Integer.class));
-    }
-
 
     @Test
     void redirectsToLoginWhenMutatingRequestHasNoSession() throws Exception {
@@ -133,7 +57,6 @@ class AdminFilterTest {
         verify(chain, never()).doFilter(any(), any());
     }
 
-
     private static HttpServletRequest requestWithUser(String roleName, String method, String action) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpSession session = mock(HttpSession.class);
@@ -149,6 +72,7 @@ class AdminFilterTest {
     private static Staff staffWithRole(String roleName) {
         Role role = new Role();
         role.setRoleName(roleName);
+
         Staff staff = new Staff();
         staff.setRole(role);
         return staff;

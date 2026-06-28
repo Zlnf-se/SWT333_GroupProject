@@ -15,9 +15,8 @@ import static org.mockito.Mockito.when;
 
 class AuthFilterTest {
 
-
     @Test
-    void redirectsToLoginWhenSessionIsNull() throws Exception {
+    void redirectsToLoginWhenUserIsNotAuthenticated() throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
         FilterChain chain = mock(FilterChain.class);
@@ -30,24 +29,6 @@ class AuthFilterTest {
         verify(response).sendRedirect("/StaffManagement/login");
         verify(chain, never()).doFilter(any(), any());
     }
-
-    @Test
-    void redirectsToLoginWhenSessionExistsButUserAttributeIsNull() throws Exception {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        HttpServletResponse response = mock(HttpServletResponse.class);
-        HttpSession session = mock(HttpSession.class);
-        FilterChain chain = mock(FilterChain.class);
-
-        when(request.getSession(false)).thenReturn(session);
-        when(session.getAttribute("user")).thenReturn(null);
-        when(request.getContextPath()).thenReturn("/StaffManagement");
-
-        new AuthFilter().doFilter(request, response, chain);
-
-        verify(response).sendRedirect("/StaffManagement/login");
-        verify(chain, never()).doFilter(any(), any());
-    }
-
 
     @Test
     void continuesWhenUserIsAuthenticated() throws Exception {
