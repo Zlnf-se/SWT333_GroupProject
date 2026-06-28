@@ -1,6 +1,7 @@
 package fu.swt301.sms.servlet;
 
 import fu.swt301.sms.entity.Staff;
+import fu.swt301.sms.service.AuthResult;
 import fu.swt301.sms.service.AuthService;
 
 import jakarta.servlet.ServletException;
@@ -27,13 +28,15 @@ public class LoginServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String email = request.getParameter("email");
         String password = request.getParameter("password");
-        Staff staff = authService.login(email, password);
-        if (staff != null) {
+        AuthResult authResult = authService.authenticate(email, password);
+        if (authResult.isSuccess()) {
+            Staff staff = authResult.getStaff();
             HttpSession session = request.getSession();
             session.setAttribute("user", staff);
             response.sendRedirect("staff-list");
         } else {
-            request.setAttribute("error", "Invalid email or password");
+            request.setAttribute("email", email);
+            request.setAttribute("error", authResult.getMessage());
             request.getRequestDispatcher("login.jsp").forward(request, response);
         }
     }

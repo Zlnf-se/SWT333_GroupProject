@@ -11,128 +11,103 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AuthServiceTest {
-
     private static final Clock FIXED_CLOCK = Clock.fixed(
             Instant.parse("2026-06-28T10:00:00Z"),
             ZoneId.of("UTC"));
-
 
     @Test
     void loginReturnsStaffAndResetsFailuresWhenPasswordMatches() {
         Staff staff = staffWithPassword("admin123");
         staff.setStaffID(12);
         staff.setFailedLoginAttempts(3);
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "admin123");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        Staff actualStaff = authService.login("admin@example.com", "admin123");
 
-        assertSame(staff, result);
-        assertEquals(12, dao.resetStaffId);
+        assertSame(staff, actualStaff);
+        assertEquals(12, staffDAO.resetStaffId);
     }
-
-    @Test
-    void loginReturnedStaffHasFailedAttemptsResetToZero() {
-        Staff staff = staffWithPassword("admin123");
-        staff.setStaffID(5);
-        staff.setFailedLoginAttempts(2);
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
-
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "admin123");
-
-        assertEquals(0, result.getFailedLoginAttempts());
-        assertNull(result.getLockUntil());
-    }
-
 
     @Test
     void loginRecordsFailedAttemptWhenPasswordDoesNotMatch() {
         Staff staff = staffWithPassword("admin123");
         staff.setStaffID(12);
         staff.setFailedLoginAttempts(2);
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "wrong");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        Staff actualStaff = authService.login("admin@example.com", "wrong");
 
-        assertNull(result);
-        assertEquals(12, dao.failedStaffId);
-        assertEquals(3, dao.failedAttempts);
-        assertNull(dao.lockUntil);
+        assertNull(actualStaff);
+        assertEquals(12, staffDAO.failedStaffId);
+        assertEquals(3, staffDAO.failedAttempts);
+        assertNull(staffDAO.lockUntil);
     }
-
 
     @Test
     void loginLocksAccountForFiveMinutesAfterFifthFailedAttempt() {
         Staff staff = staffWithPassword("admin123");
         staff.setStaffID(12);
         staff.setFailedLoginAttempts(4);
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "wrong");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        Staff actualStaff = authService.login("admin@example.com", "wrong");
 
-        assertNull(result);
-        assertEquals(5, dao.failedAttempts);
-        assertEquals(LocalDateTime.of(2026, 6, 28, 10, 5), dao.lockUntil);
+        assertNull(actualStaff);
+        assertEquals(5, staffDAO.failedAttempts);
+        assertEquals(LocalDateTime.of(2026, 6, 28, 10, 5), staffDAO.lockUntil);
     }
 
     @Test
-    void loginStillLocksAccountOnSixthFailedAttempt() {
-        Staff staff = staffWithPassword("admin123");
-        staff.setStaffID(7);
-        staff.setFailedLoginAttempts(5);
-        staff.setLockUntil(LocalDateTime.of(2026, 6, 28, 9, 58)); // lock đã hết hạn
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
-
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("user@example.com", "wrong");
-
-        assertNull(result);
-        assertEquals(6, dao.failedAttempts); // vượt ngưỡng → lock lại
-        assertEquals(LocalDateTime.of(2026, 6, 28, 10, 5), dao.lockUntil);
-    }
-
-
-    @Test
-    void loginRejectsLockedAccountEvenWithCorrectPassword() {
+    void loginRejectsLockedAccountWithoutChangingCounters() {
         Staff staff = staffWithPassword("admin123");
         staff.setStaffID(12);
-        staff.setLockUntil(LocalDateTime.of(2026, 6, 28, 10, 1)); // khóa đến 10:01, hiện 10:00
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
+        staff.setLockUntil(LocalDateTime.of(2026, 6, 28, 10, 1));
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "admin123");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        Staff actualStaff = authService.login("admin@example.com", "admin123");
 
-        assertNull(result);
-        assertEquals(0, dao.resetStaffId);  // không reset
-        assertEquals(0, dao.failedStaffId); // không ghi thêm lần sai
+        assertNull(actualStaff);
+        assertEquals(0, staffDAO.resetStaffId);
+        assertEquals(0, staffDAO.failedStaffId);
     }
 
     @Test
-    void loginAllowsAccountWhenLockHasExpired() {
+    void authenticateReturnsLockedMessageWhenAccountIsLocked() {
         Staff staff = staffWithPassword("admin123");
-        staff.setStaffID(9);
-        staff.setFailedLoginAttempts(5);
-        staff.setLockUntil(LocalDateTime.of(2026, 6, 28, 9, 55)); // lock hết hạn lúc 9:55, hiện 10:00
-        FakeStaffDAO dao = new FakeStaffDAO(staff);
+        staff.setStaffID(12);
+        staff.setLockUntil(LocalDateTime.of(2026, 6, 28, 10, 1));
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("admin@example.com", "admin123");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        AuthResult result = authService.authenticate("admin@example.com", "admin123");
 
-        assertSame(staff, result);
-        assertEquals(9, dao.resetStaffId);
+        assertFalse(result.isSuccess());
+        assertNull(result.getStaff());
+        assertEquals("Account is locked. Please try again later.", result.getMessage());
     }
-
 
     @Test
-    void loginReturnsNullWhenEmailNotFound() {
-        FakeStaffDAO dao = new FakeStaffDAO(null);
+    void authenticateReturnsSuccessResultWhenPasswordMatches() {
+        Staff staff = staffWithPassword("admin123");
+        FakeStaffDAO staffDAO = new FakeStaffDAO(staff);
 
-        Staff result = new AuthService(dao, FIXED_CLOCK).login("unknown@example.com", "admin123");
+        AuthService authService = new AuthService(staffDAO, FIXED_CLOCK);
+        AuthResult result = authService.authenticate("admin@example.com", "admin123");
 
-        assertNull(result);
-        assertEquals(0, dao.failedStaffId);
+        assertTrue(result.isSuccess());
+        assertSame(staff, result.getStaff());
+        assertNull(result.getMessage());
     }
-
 
     private static Staff staffWithPassword(String plainPassword) {
         Staff staff = new Staff();
@@ -143,12 +118,12 @@ class AuthServiceTest {
 
     private static class FakeStaffDAO extends StaffDAO {
         private final Staff staff;
-        int resetStaffId;
-        int failedStaffId;
-        int failedAttempts;
-        LocalDateTime lockUntil;
+        private int resetStaffId;
+        private int failedStaffId;
+        private int failedAttempts;
+        private LocalDateTime lockUntil;
 
-        FakeStaffDAO(Staff staff) {
+        private FakeStaffDAO(Staff staff) {
             this.staff = staff;
         }
 

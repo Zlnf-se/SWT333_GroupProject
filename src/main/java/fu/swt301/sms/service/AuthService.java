@@ -28,16 +28,24 @@ public class AuthService {
     }
 
     public Staff login(String email, String password) {
+        AuthResult result = authenticate(email, password);
+        return result.isSuccess() ? result.getStaff() : null;
+    }
+
+    public AuthResult authenticate(String email, String password) {
         Staff staff = staffDAO.findByEmail(email);
-        if (staff == null || isLocked(staff)) {
-            return null;
+        if (staff == null) {
+            return AuthResult.failure("Invalid email or password");
+        }
+        if (isLocked(staff)) {
+            return AuthResult.failure("Account is locked. Please try again later.");
         }
 
         if (PasswordUtils.checkPassword(password, staff.getPassword())) {
             staffDAO.resetLoginFailures(staff.getStaffID());
             staff.setFailedLoginAttempts(0);
             staff.setLockUntil(null);
-            return staff;
+            return AuthResult.success(staff);
         }
 
         int failedAttempts = staff.getFailedLoginAttempts() + 1;
@@ -46,7 +54,7 @@ public class AuthService {
             lockUntil = LocalDateTime.now(clock).plusMinutes(LOCK_MINUTES);
         }
         staffDAO.recordFailedLogin(staff.getStaffID(), failedAttempts, lockUntil);
-        return null;
+        return AuthResult.failure("Invalid email or password");
     }
 
     private boolean isLocked(Staff staff) {

@@ -1,5 +1,6 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="jakarta.tags.core" prefix="c" %>
+<%@ taglib uri="jakarta.tags.functions" prefix="fn" %>
 <html>
 <head>
     <title>${empty staff ? 'Add Staff' : 'Edit Staff'}</title>
@@ -22,7 +23,7 @@
     <c:if test="${isAdmin}">
     <c:if test="${not empty errorMessage}">
         <div class="alert alert-danger text-center" role="alert">
-            ${errorMessage}
+            <c:out value="${errorMessage}" />
         </div>
     </c:if>
 
@@ -35,11 +36,13 @@
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label for="employeeCode">Employee Code</label>
-                <input type="text" class="form-control" id="employeeCode" name="employeeCode" value="${staff.employeeCode}" maxlength="50">
+                <input type="text" class="form-control" id="employeeCode" name="employeeCode"
+                       value="${fn:escapeXml(staff.employeeCode)}" required maxlength="50"
+                       pattern="[A-Za-z0-9-]{3,50}" title="Use 3-50 letters, numbers, or hyphens.">
             </div>
             <div class="form-group col-md-6">
                 <label for="fullName">Full Name</label>
-                <input type="text" class="form-control" id="fullName" name="fullName" value="${staff.fullName}" required maxlength="100">
+                <input type="text" class="form-control" id="fullName" name="fullName" value="${fn:escapeXml(staff.fullName)}" required maxlength="100">
             </div>
         </div>
 
@@ -57,20 +60,20 @@
             </div>
             <div class="form-group col-md-6">
                 <label for="dateOfBirth">Date of Birth</label>
-                <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" value="${staff.dateOfBirth}">
+                <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" value="${fn:escapeXml(staff.dateOfBirth)}" required>
             </div>
         </div>
 
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label for="phoneNumber">Phone Number</label>
-                <input type="text" class="form-control" id="phoneNumber" name="phoneNumber" value="${staff.phoneNumber}"
+                <input type="text" class="form-control" id="phoneNumber" name="phoneNumber" value="${fn:escapeXml(staff.phoneNumber)}"
                        required maxlength="10" pattern="0[0-9]{9}"
                        title="Phone number must be 10 digits and start with 0.">
             </div>
             <div class="form-group col-md-6">
                 <label for="email">Email</label>
-                <input type="email" class="form-control" id="email" name="email" value="${staff.email}" required maxlength="100">
+                <input type="email" class="form-control" id="email" name="email" value="${fn:escapeXml(staff.email)}" required maxlength="100">
             </div>
         </div>
 
@@ -84,22 +87,22 @@
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label for="department">Department</label>
-                <input type="text" class="form-control" id="department" name="department" value="${staff.department}" maxlength="100">
+                <input type="text" class="form-control" id="department" name="department" value="${fn:escapeXml(staff.department)}" required maxlength="100">
             </div>
             <div class="form-group col-md-6">
                 <label for="position">Position</label>
-                <input type="text" class="form-control" id="position" name="position" value="${staff.position}" maxlength="100">
+                <input type="text" class="form-control" id="position" name="position" value="${fn:escapeXml(staff.position)}" required maxlength="100">
             </div>
         </div>
 
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label for="salary">Salary</label>
-                <input type="number" class="form-control" id="salary" name="salary" value="${staff.salary}" min="0" step="0.01">
+                <input type="number" class="form-control" id="salary" name="salary" value="${fn:escapeXml(staff.salary)}" required min="0" step="0.01">
             </div>
             <div class="form-group col-md-6">
                 <label for="hireDate">Hire Date</label>
-                <input type="date" class="form-control" id="hireDate" name="hireDate" value="${staff.hireDate}">
+                <input type="date" class="form-control" id="hireDate" name="hireDate" value="${fn:escapeXml(staff.hireDate)}" required>
             </div>
         </div>
 
@@ -109,7 +112,7 @@
                 <select class="form-control" id="roleID" name="roleID" required>
                     <c:forEach var="role" items="${roleList}">
                         <option value="${role.roleID}" ${staff.role.roleID == role.roleID ? 'selected' : ''}>
-                            ${role.roleName}
+                            <c:out value="${role.roleName}" />
                         </option>
                     </c:forEach>
                 </select>
