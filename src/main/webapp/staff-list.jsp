@@ -26,6 +26,7 @@
         </div>
         <div class="col-md-6 text-right">
             <a href="staff-crud?action=create" class="btn btn-success">Add New Staff</a>
+            <a href="logout" class="btn btn-outline-secondary ml-2">Logout</a>
         </div>
     </div>
     <table class="table table-bordered">
